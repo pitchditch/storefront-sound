@@ -1,6 +1,16 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
+function setCors(res: VercelResponse) {
+  res.setHeader("Access-Control-Allow-Origin", "*"); // or set your domain
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Max-Age", "86400");
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  setCors(res);
+  if (req.method === "OPTIONS") return res.status(200).end();
+
   try {
     if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
@@ -8,7 +18,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!toPhoneNumber) return res.status(400).json({ error: "Missing toPhoneNumber" });
 
     const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER, PUBLIC_BASE_URL } = process.env;
-
     if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_FROM_NUMBER || !PUBLIC_BASE_URL) {
       return res.status(500).json({ error: "Missing required environment variables" });
     }
@@ -22,9 +31,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       Url: twimlWebhookUrl,
     });
 
-    // Optional: pass metadata via StatusCallback if you want
-    // form.append("StatusCallback", `${PUBLIC_BASE_URL}/api/status`);
-
     const r = await fetch(twilioURL, {
       method: "POST",
       headers: {
@@ -35,10 +41,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     const result = await r.json();
+    // Forward Twilio response (includes `sid`)
     return res.status(r.ok ? 200 : 400).json(result);
   } catch (err: any) {
     console.error("trigger-call error:", err);
     return res.status(500).json({ error: "Function crashed", detail: String(err?.message || err) });
   }
 }
-
