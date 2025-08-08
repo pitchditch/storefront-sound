@@ -4,6 +4,7 @@ import { CallStatus } from "@/lib/storage";
 export const StatusChip = ({ status }: { status: CallStatus }) => {
   const map: Record<CallStatus, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
     Pending: { variant: "outline", label: "Pending" },
+    Calling: { variant: "secondary", label: "Calling" },
     Placing: { variant: "secondary", label: "Placing" },
     Ringing: { variant: "default", label: "Ringing" },
     Answered: { variant: "default", label: "Answered" },

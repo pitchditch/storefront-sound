@@ -74,7 +74,7 @@ const BulkDialer = () => {
         continue;
       }
 
-      rows[i].status = "Placing";
+      rows[i].status = "Calling";
       setRows([...rows]);
 
       const payload = {
@@ -103,6 +103,7 @@ const BulkDialer = () => {
           businessName: r.business_name || undefined,
           notes: r.notes || undefined,
           status: rows[i].status,
+          callSid: data.callSid ?? data.sid,
           recordingUrl: data.recordingUrl,
           outcome: data.outcome,
         });
@@ -146,9 +147,36 @@ const BulkDialer = () => {
                   <TableBody>
                     {rows.map((r, idx) => (
                       <TableRow key={idx}>
-                        <TableCell className="font-mono">{r.phone_number}</TableCell>
-                        <TableCell>{r.business_name}</TableCell>
-                        <TableCell className="max-w-[300px] truncate">{r.notes}</TableCell>
+                        <TableCell className="font-mono">
+                          <Input
+                            value={r.phone_number}
+                            onChange={(e)=>{
+                              const next = [...rows];
+                              next[idx].phone_number = e.target.value;
+                              setRows(next);
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            value={r.business_name}
+                            onChange={(e)=>{
+                              const next = [...rows];
+                              next[idx].business_name = e.target.value;
+                              setRows(next);
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell className="max-w-[300px]">
+                          <Input
+                            value={r.notes}
+                            onChange={(e)=>{
+                              const next = [...rows];
+                              next[idx].notes = e.target.value;
+                              setRows(next);
+                            }}
+                          />
+                        </TableCell>
                         <TableCell><StatusChip status={r.status} /></TableCell>
                       </TableRow>
                     ))}

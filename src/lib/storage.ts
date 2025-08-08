@@ -7,6 +7,7 @@ export const STORAGE_KEYS = {
 
 export type CallStatus =
   | "Pending"
+  | "Calling"
   | "Placing"
   | "Ringing"
   | "Answered"
@@ -20,6 +21,7 @@ export interface CallLogEntry {
   businessName?: string;
   notes?: string;
   status: CallStatus;
+  callSid?: string;
   recordingUrl?: string;
   outcome?: string;
 }

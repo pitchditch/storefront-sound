@@ -68,7 +68,8 @@ const Index = () => {
         phone: normalized,
         businessName,
         notes,
-        status: ok ? (data.status ?? "Placing") : "Failed",
+        status: ok ? (data.status ?? "Calling") : "Failed",
+        callSid: data.callSid ?? data.sid,
         recordingUrl: data.recordingUrl,
         outcome: data.outcome,
       });
@@ -104,8 +105,8 @@ const Index = () => {
       <section className="container mx-auto px-4 py-10">
         <div className="max-w-2xl mx-auto">
           <header className="mb-8 text-center">
-            <h1 className="text-3xl md:text-4xl font-bold mb-2">Call Storefronts Now — Window Cleaning in Metro Vancouver</h1>
-            <p className="text-muted-foreground">We book monthly window cleaning for storefronts. Same/next-day availability.</p>
+            <h1 className="text-3xl md:text-4xl font-bold mb-2">Call Storefronts & Win More Business</h1>
+            <p className="text-muted-foreground">Book monthly window cleaning packages in minutes with our AI caller.</p>
           </header>
 
           <Card className="shadow-sm">

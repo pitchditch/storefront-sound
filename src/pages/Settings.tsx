@@ -12,7 +12,7 @@ const DEFAULT_SMS = "Hey {{business_name}}, it’s Jayden from BC Pressure Washi
 
 const Settings = () => {
   const { toast } = useToast();
-  const [url, setUrl] = useLocalStorage<string>(STORAGE_KEYS.CALL_TRIGGER_URL, "");
+  const [url, setUrl] = useLocalStorage<string>(STORAGE_KEYS.CALL_TRIGGER_URL, "https://storefront-sound.vercel.app/api/trigger-call");
   const [sms, setSms] = useLocalStorage<string>(STORAGE_KEYS.SMS_TEMPLATE, DEFAULT_SMS);
   const [vm, setVm] = useLocalStorage<string>(STORAGE_KEYS.VOICEMAIL_SCRIPT, "Friendly voicemail script for your agent.");
 
@@ -36,7 +36,7 @@ const Settings = () => {
               <Input value={url} onChange={(e)=>setUrl(e.target.value)} placeholder="https://your-app.vercel.app/api/trigger-call" />
               <Button onClick={save} disabled={!url}>Save Settings</Button>
               <p className="text-sm text-muted-foreground">Saved under key <code className="font-mono">{STORAGE_KEYS.CALL_TRIGGER_URL}</code>.</p>
-              <p className="text-sm text-muted-foreground">TODO: Paste your final Vercel Trigger URL above.</p>
+              <p className="text-sm text-muted-foreground">Your Trigger URL is stored in localStorage under <code className="font-mono">{STORAGE_KEYS.CALL_TRIGGER_URL}</code>.</p>
             </CardContent>
           </Card>
 

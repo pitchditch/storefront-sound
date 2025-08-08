@@ -61,7 +61,9 @@ const CallLog = () => {
                       <TableHead>Date/Time</TableHead>
                       <TableHead>Phone</TableHead>
                       <TableHead>Business</TableHead>
+                      <TableHead>Notes</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Call SID</TableHead>
                       <TableHead>Outcome</TableHead>
                       <TableHead>Recording</TableHead>
                     </TableRow>
@@ -72,7 +74,9 @@ const CallLog = () => {
                         <TableCell>{new Date(l.timestamp).toLocaleString()}</TableCell>
                         <TableCell className="font-mono">{l.phone}</TableCell>
                         <TableCell>{l.businessName}</TableCell>
+                        <TableCell className="max-w-[300px] truncate">{l.notes || "-"}</TableCell>
                         <TableCell><StatusChip status={l.status} /></TableCell>
+                        <TableCell className="font-mono">{l.callSid || "-"}</TableCell>
                         <TableCell>{l.outcome || "-"}</TableCell>
                         <TableCell>{l.recordingUrl ? <a className="underline" href={l.recordingUrl} target="_blank" rel="noreferrer">Link</a> : "-"}</TableCell>
                       </TableRow>
