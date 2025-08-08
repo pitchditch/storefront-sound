@@ -1,14 +1,19 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
-function setCors(res: VercelResponse) {
+export const config = { runtime: "nodejs20.x" };
+
+
+function setCors(req: VercelRequest, res: VercelResponse) {
+  const reqHeaders = (req.headers["access-control-request-headers"] as string) || "";
+  const allowHeaders = reqHeaders || "Content-Type, Authorization, X-Requested-With, x-health-check";
   res.setHeader("Access-Control-Allow-Origin", "*"); // or set your domain
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", allowHeaders);
   res.setHeader("Access-Control-Max-Age", "86400");
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  setCors(res);
+  setCors(req, res);
   if (req.method === "OPTIONS") return res.status(200).end();
 
   try {
