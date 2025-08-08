@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { STORAGE_KEYS, CallLogEntry } from "@/lib/storage";
 import { isValidE164, normalizeToE164Draft } from "@/lib/phone";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -18,7 +19,7 @@ const Index = () => {
   const [notes, setNotes] = useState("");
   const [openConfirm, setOpenConfirm] = useState(false);
 
-  const triggerUrl = useMemo(() => localStorage.getItem(STORAGE_KEYS.CALL_TRIGGER_URL) || "", []);
+  const [triggerUrl] = useLocalStorage<string>(STORAGE_KEYS.CALL_TRIGGER_URL, "");
 
   useEffect(() => {
     document.title = "Call Storefronts — BC Pressure Washing";
