@@ -1,17 +1,18 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+export const config = { runtime: "edge" };
 
-function setCors(req: VercelRequest, res: VercelResponse) {
-  const reqHeaders = (req.headers["access-control-request-headers"] as string) || "";
-  const allowHeaders = reqHeaders || "Content-Type, Authorization, X-Requested-With, x-health-check";
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", allowHeaders);
-  res.setHeader("Access-Control-Max-Age", "86400");
+function corsHeaders(req: Request, methods: string[]) {
+  const reqHeaders = req.headers.get("access-control-request-headers") || "Content-Type, Authorization, X-Requested-With, x-health-check";
+  return {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": methods.join(", "),
+    "Access-Control-Allow-Headers": reqHeaders,
+    "Access-Control-Max-Age": "86400",
+  } as Record<string, string>;
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  setCors(req, res);
-  if (req.method === "OPTIONS") return res.status(200).end();
+export default async function handler(req: Request): Promise<Response> {
+  const cors = corsHeaders(req, ["GET", "OPTIONS"]);
+  if (req.method === "OPTIONS") return new Response(null, { status: 200, headers: cors });
   try {
     const agentId = process.env.ELEVENLABS_AGENT_ID || "agent_8801k1zkfgxbe6k86btzyhxmzga2";
     const xml = `
@@ -22,10 +23,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       </Response>
     `.trim();
 
-    res.setHeader("Content-Type", "text/xml");
-    res.status(200).send(xml);
+    return new Response(xml, {
+      status: 200,
+      headers: { "Content-Type": "text/xml", ...cors },
+    });
   } catch (err: any) {
     console.error("twiml error:", err);
-    res.status(500).send(`<Response><Say>Server error.</Say></Response>`);
+    return new Response(`<Response><Say>Server error.</Say></Response>`, {
+      status: 500,
+      headers: { "Content-Type": "text/xml", ...cors },
+    });
   }
 }

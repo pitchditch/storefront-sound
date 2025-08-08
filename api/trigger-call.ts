@@ -1,52 +1,78 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+export const config = { runtime: "edge" };
 
-function setCors(req: VercelRequest, res: VercelResponse) {
-  const reqHeaders = (req.headers["access-control-request-headers"] as string) || "";
-  const allowHeaders = reqHeaders || "Content-Type, Authorization, X-Requested-With, x-health-check";
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", allowHeaders);
-  res.setHeader("Access-Control-Max-Age", "86400");
+function corsHeaders(req: Request, methods: string[]) {
+  const reqHeaders = req.headers.get("access-control-request-headers") || "Content-Type, Authorization, X-Requested-With, x-health-check";
+  return {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": methods.join(", "),
+    "Access-Control-Allow-Headers": reqHeaders,
+    "Access-Control-Max-Age": "86400",
+  } as Record<string, string>;
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  setCors(req, res);
-  if (req.method === "OPTIONS") return res.status(200).end();
+export default async function handler(req: Request): Promise<Response> {
+  const cors = corsHeaders(req, ["GET", "POST", "OPTIONS"]);
+  if (req.method === "OPTIONS") return new Response(null, { status: 200, headers: cors });
 
   try {
-    if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
-
-    const { toPhoneNumber, businessName, notes } = req.body || {};
-    if (!toPhoneNumber) return res.status(400).json({ error: "Missing toPhoneNumber" });
-
-    const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER, PUBLIC_BASE_URL } = process.env as Record<string, string | undefined>;
-    if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_FROM_NUMBER || !PUBLIC_BASE_URL) {
-      return res.status(500).json({ error: "Missing required environment variables" });
+    if (req.method !== "POST") {
+      return new Response(JSON.stringify({ error: "Method not allowed" }), {
+        status: 405,
+        headers: { "content-type": "application/json", ...cors },
+      });
     }
 
-    const twilioURL = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Calls.json`;
-    const twimlWebhookUrl = `${PUBLIC_BASE_URL}/api/twiml`;
+    const { toPhoneNumber, businessName, notes } = await req.json().catch(() => ({} as any));
+    if (!toPhoneNumber) {
+      return new Response(JSON.stringify({ error: "Missing toPhoneNumber" }), {
+        status: 400,
+        headers: { "content-type": "application/json", ...cors },
+      });
+    }
+
+    const sid = process.env.TWILIO_ACCOUNT_SID;
+    const token = process.env.TWILIO_AUTH_TOKEN;
+    const fromNumber = process.env.TWILIO_FROM_NUMBER;
+    const publicBaseUrl = process.env.PUBLIC_BASE_URL;
+
+    if (!sid || !token || !fromNumber || !publicBaseUrl) {
+      return new Response(JSON.stringify({ error: "Missing required environment variables" }), {
+        status: 500,
+        headers: { "content-type": "application/json", ...cors },
+      });
+    }
+
+    const twilioURL = `https://api.twilio.com/2010-04-01/Accounts/${sid}/Calls.json`;
+    const twimlWebhookUrl = `${publicBaseUrl}/api/twiml`;
 
     const form = new URLSearchParams({
       To: toPhoneNumber,
-      From: TWILIO_FROM_NUMBER,
+      From: fromNumber,
       Url: twimlWebhookUrl,
     });
+
+    const basic = btoa(new TextDecoder().decode(new Uint8Array(new TextEncoder().encode(`${sid}:${token}`))));
 
     const r = await fetch(twilioURL, {
       method: "POST",
       headers: {
-        Authorization: "Basic " + Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString("base64"),
+        Authorization: `Basic ${basic}`,
         "Content-Type": "application/x-www-form-urlencoded",
       },
       body: form.toString(),
     });
 
-    const result = await r.json();
-    // Forward Twilio response (includes `sid`)
-    return res.status(r.ok ? 200 : 400).json(result);
+    const result = await r.json().catch(() => ({ error: "Invalid JSON from Twilio" }));
+
+    return new Response(JSON.stringify(result), {
+      status: r.ok ? 200 : 400,
+      headers: { "content-type": "application/json", ...cors },
+    });
   } catch (err: any) {
     console.error("trigger-call error:", err);
-    return res.status(500).json({ error: "Function crashed", detail: String(err?.message || err) });
+    return new Response(JSON.stringify({ error: "Function crashed", detail: String(err?.message || err) }), {
+      status: 500,
+      headers: { "content-type": "application/json", ...cors },
+    });
   }
 }
