@@ -1,12 +1,9 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
-export const config = { runtime: "nodejs20.x" };
-
-
 function setCors(req: VercelRequest, res: VercelResponse) {
   const reqHeaders = (req.headers["access-control-request-headers"] as string) || "";
   const allowHeaders = reqHeaders || "Content-Type, Authorization, X-Requested-With, x-health-check";
-  res.setHeader("Access-Control-Allow-Origin", "*"); // or set your domain
+  res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", allowHeaders);
   res.setHeader("Access-Control-Max-Age", "86400");
@@ -22,7 +19,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { toPhoneNumber, businessName, notes } = req.body || {};
     if (!toPhoneNumber) return res.status(400).json({ error: "Missing toPhoneNumber" });
 
-    const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER, PUBLIC_BASE_URL } = process.env;
+    const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER, PUBLIC_BASE_URL } = process.env as Record<string, string | undefined>;
     if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_FROM_NUMBER || !PUBLIC_BASE_URL) {
       return res.status(500).json({ error: "Missing required environment variables" });
     }

@@ -1,7 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
-export const config = { runtime: "nodejs20.x" };
-
 function setCors(req: VercelRequest, res: VercelResponse) {
   const reqHeaders = (req.headers["access-control-request-headers"] as string) || "";
   const allowHeaders = reqHeaders || "Content-Type, Authorization, X-Requested-With, x-health-check";
