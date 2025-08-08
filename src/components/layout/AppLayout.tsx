@@ -3,6 +3,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { NavLink, Link } from "react-router-dom";
 import { Phone, Upload, List, Settings } from "lucide-react";
+import { ApiStatusChip } from "@/components/ApiStatusChip";
 
 const MissingUrlBanner = () => {
   const url = localStorage.getItem("CALL_TRIGGER_URL");
@@ -26,12 +27,18 @@ export const AppLayout = ({ children }: PropsWithChildren) => {
       <header className="border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Link to="/" className="font-bold text-lg">BC Pressure Washing</Link>
-          <nav className="hidden sm:flex gap-6 text-sm">
-            <NavLink to="/" className={({isActive})=> isActive?"text-primary":"text-muted-foreground hover:text-foreground"}>Call</NavLink>
-            <NavLink to="/bulk" className={({isActive})=> isActive?"text-primary":"text-muted-foreground hover:text-foreground"}>Bulk</NavLink>
-            <NavLink to="/logs" className={({isActive})=> isActive?"text-primary":"text-muted-foreground hover:text-foreground"}>Logs</NavLink>
-            <NavLink to="/settings" className={({isActive})=> isActive?"text-primary":"text-muted-foreground hover:text-foreground"}>Settings</NavLink>
-          </nav>
+          <div className="flex items-center gap-4">
+            {/* API status indicator */}
+            {/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */}
+            {/* @ts-ignore - cva variant type widening */}
+            <ApiStatusChip />
+            <nav className="hidden sm:flex gap-6 text-sm">
+              <NavLink to="/" className={({isActive})=> isActive?"text-primary":"text-muted-foreground hover:text-foreground"}>Call</NavLink>
+              <NavLink to="/bulk" className={({isActive})=> isActive?"text-primary":"text-muted-foreground hover:text-foreground"}>Bulk</NavLink>
+              <NavLink to="/logs" className={({isActive})=> isActive?"text-primary":"text-muted-foreground hover:text-foreground"}>Logs</NavLink>
+              <NavLink to="/settings" className={({isActive})=> isActive?"text-primary":"text-muted-foreground hover:text-foreground"}>Settings</NavLink>
+            </nav>
+          </div>
         </div>
         <Separator />
         <MissingUrlBanner />

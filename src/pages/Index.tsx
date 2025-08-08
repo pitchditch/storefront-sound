@@ -74,7 +74,19 @@ const Index = () => {
         outcome: data.outcome,
       });
 
-      toast({ title: ok ? "Call triggered" : "Failed to trigger", description: ok ? "Check Logs for status" : String(data?.error || res.statusText) });
+      if (ok) {
+        toast({ title: "Call triggered", description: "Check Logs for status" });
+      } else {
+        const code = (data && (data.code || data.error_code)) as string | number | undefined;
+        const msg = (data && (data.message || data.error || data.detail)) || res.statusText || "Request failed";
+        const hint = res.status === 404
+          ? "Endpoint not found — verify your Vercel URL and deployment."
+          : res.status === 500 && typeof msg === "string" && msg.toLowerCase().includes("environment")
+          ? "Missing env vars on Vercel (TWILIO_* / PUBLIC_BASE_URL)."
+          : undefined;
+        const description = [msg, code ? `Code: ${code}` : null, hint].filter(Boolean).join(" — ");
+        toast({ title: "Failed to trigger", description });
+      }
     } catch (e) {
       appendLog({
         id,
@@ -84,7 +96,7 @@ const Index = () => {
         notes,
         status: "Failed",
       });
-      toast({ title: "Network error", description: "Could not reach your Vercel endpoint" });
+      toast({ title: "Network error", description: "Could not reach your Vercel endpoint (CORS or offline)" });
     }
   };
 
