@@ -1,37 +1,59 @@
-export const config = { runtime: "edge" };
+import type { VercelRequest, VercelResponse } from "@vercel/node";
 
-function corsHeaders(req: Request, methods: string[]) {
-  const reqHeaders = req.headers.get("access-control-request-headers") || "Content-Type, Authorization, X-Requested-With, x-health-check";
-  return {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": methods.join(", "),
-    "Access-Control-Allow-Headers": reqHeaders,
-    "Access-Control-Max-Age": "86400",
-  } as Record<string, string>;
-}
-
-export default async function handler(req: Request): Promise<Response> {
-  const cors = corsHeaders(req, ["GET", "OPTIONS"]);
-  if (req.method === "OPTIONS") return new Response(null, { status: 200, headers: cors });
+export default async function handler(_req: VercelRequest, res: VercelResponse) {
   try {
-    const agentId = process.env.ELEVENLABS_AGENT_ID || "agent_8801k1zkfgxbe6k86btzyhxmzga2";
+    const apiKey  = process.env.ELEVENLABS_API_KEY;
+    const agentId = process.env.ELEVENLABS_AGENT_ID;
+
+    if (!apiKey || !agentId) {
+      res.setHeader("Content-Type", "text/xml");
+      return res
+        .status(500)
+        .send(`<Response><Say>Server missing ElevenLabs credentials.</Say></Response>`);
+    }
+
+    // 1) Ask ElevenLabs for a fresh signed conversation token
+    const r = await fetch("https://api.elevenlabs.io/v1/convai/conversation", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "xi-api-key": apiKey,
+      },
+      body: JSON.stringify({ agent_id: agentId }),
+    });
+
+    if (!r.ok) {
+      const text = await r.text().catch(() => "");
+      res.setHeader("Content-Type", "text/xml");
+      return res
+        .status(502)
+        .send(`<Response><Say>Could not start agent.</Say></Response>`);
+    }
+
+    const data = (await r.json()) as { conversation_signature: string };
+    const signedUrl = `wss://api.elevenlabs.io/v1/convai/conversation?agent_id=${encodeURIComponent(
+      agentId
+    )}&conversation_signature=${encodeURIComponent(data.conversation_signature)}`;
+
+    // 2) Give Twilio TwiML that streams to the signed URL
     const xml = `
       <Response>
         <Connect>
-          <Stream url="wss://api.elevenlabs.io/v1/stream/agent/${agentId}"/>
+          <Stream url="wss://api.elevenlabs.io/v1/convai/stream">
+            <Parameter name="agent_id" value="${agentId}"/>
+            <Parameter name="signed_url" value="${signedUrl}"/>
+          </Stream>
         </Connect>
       </Response>
     `.trim();
 
-    return new Response(xml, {
-      status: 200,
-      headers: { "Content-Type": "text/xml", ...cors },
-    });
-  } catch (err: any) {
+    res.setHeader("Content-Type", "text/xml");
+    return res.status(200).send(xml);
+  } catch (err) {
     console.error("twiml error:", err);
-    return new Response(`<Response><Say>Server error.</Say></Response>`, {
-      status: 500,
-      headers: { "Content-Type": "text/xml", ...cors },
-    });
+    res.setHeader("Content-Type", "text/xml");
+    return res
+      .status(500)
+      .send(`<Response><Say>Application error. Please try again later.</Say></Response>`);
   }
 }
