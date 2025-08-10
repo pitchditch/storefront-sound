@@ -11,32 +11,30 @@ export default async function handler(_req: VercelRequest, res: VercelResponse) 
       return res.status(500).send(`<Response><Say>Server missing AI credentials.</Say></Response>`);
     }
 
-    // 1) Create a conversation (returns a short-lived signature)
-    const resp = await fetch("https://api.elevenlabs.io/v1/convai/conversation", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "xi-api-key": apiKey },
-      body: JSON.stringify({ agent_id: agentId }),
+    // 1) Get a signed URL for the conversation (short-lived URL authorizing the websocket)
+    const url = `https://api.elevenlabs.io/v1/convai/conversation/get_signed_url?agent_id=${encodeURIComponent(agentId)}`;
+    const resp = await fetch(url, {
+      method: "GET",
+      headers: { "xi-api-key": apiKey },
     });
 
     if (!resp.ok) {
-      console.error("ElevenLabs convai error:", resp.status, await resp.text().catch(() => ""));
+      const errText = await resp.text().catch(() => "");
+      console.error("ElevenLabs get_signed_url error:", resp.status, errText);
       res.setHeader("Content-Type", "text/xml");
-      return res.status(502).send(`<Response><Say>Agent unavailable.</Say></Response>`);
+      return res.status(502).send(`<Response><Say>Agent authorization failed.</Say></Response>`);
     }
 
-    const { conversation_signature } = await resp.json() as { conversation_signature: string };
-
-    const signedUrl = `wss://api.elevenlabs.io/v1/convai/conversation?agent_id=${encodeURIComponent(
-      agentId
-    )}&conversation_signature=${encodeURIComponent(conversation_signature)}`;
+    const { signed_url } = (await resp.json()) as { signed_url: string };
 
     // 2) Return TwiML instructing Twilio to open a media stream to ElevenLabs
+    // Twilio will connect to the stream URL and pass our signed URL as a parameter.
     const xml = `
       <Response>
         <Connect>
           <Stream url="wss://api.elevenlabs.io/v1/convai/stream">
             <Parameter name="agent_id" value="${agentId}"/>
-            <Parameter name="signed_url" value="${signedUrl}"/>
+            <Parameter name="signed_url" value="${signed_url}"/>
           </Stream>
         </Connect>
       </Response>
