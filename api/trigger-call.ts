@@ -60,9 +60,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       From: TWILIO_FROM_NUMBER,
       Url: twimlWebhookUrl
     });
-    // Optional metadata:
-    // form.append("StatusCallback", `${baseUrl}/api/status`);
-    // form.append("StatusCallbackEvent", "initiated ringing answered completed");
+    // Status callback for call lifecycle events
+    form.append("StatusCallback", `${baseUrl}/api/status`);
+    form.append("StatusCallbackMethod", "POST");
+    form.append("StatusCallbackEvent", "initiated ringing answered completed");
 
     const r = await fetch(twilioURL, {
       method: "POST",
