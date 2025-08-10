@@ -1,88 +1,101 @@
-// /api/trigger-call.ts
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+// Edge runtime
+export const config = { runtime: "edge" };
 
-function setCors(res: VercelResponse) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Health-Check");
+function setCors(res: ResponseInit): ResponseInit {
+  return {
+    ...res,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, X-Health-Check",
+      ...(res.headers as any),
+    },
+  };
 }
 
-function getBaseUrl(req: VercelRequest): string | undefined {
-  const host = req.headers.host;
-  if (!host) return undefined;
-  const proto = host.includes("localhost") ? "http" : "https";
-  return `${proto}://${host}`;
+function isE164(p?: string) {
+  return typeof p === "string" && /^\+\d{8,15}$/.test(p);
 }
 
-function isE164(phone?: string) {
-  return typeof phone === "string" && /^\+\d{8,15}$/.test(phone);
-}
+export default async function handler(req: Request): Promise<Response> {
+  if (req.method === "OPTIONS") return new Response(null, setCors({ status: 200 }));
+  if (req.method !== "POST")
+    return new Response(
+      JSON.stringify({ error: "Method not allowed" }),
+      setCors({ status: 405 })
+    );
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  setCors(res);
-  if (req.method === "OPTIONS") return res.status(200).end();
-  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  // health probe
+  if (req.headers.get("x-health-check")) {
+    return new Response(
+      JSON.stringify({ ok: true, message: "trigger-call reachable" }),
+      setCors({ status: 200, headers: { "Content-Type": "application/json" } })
+    );
+  }
 
   try {
-    const isHealthCheck =
-      req.headers["x-health-check"] === "true" || req.headers["x-health-check"] === "1";
-    if (isHealthCheck) return res.status(200).json({ ok: true, message: "trigger-call reachable" });
-
-    // Body can arrive as string or object; normalize
-    const raw = (req.body ?? {}) as any;
-    const bodyObj = typeof raw === "string" ? JSON.parse(raw) : raw;
-
-    const { toPhoneNumber, businessName, notes } = (bodyObj ?? {}) as {
-      toPhoneNumber?: string; businessName?: string; notes?: string;
-    };
+    const raw = await req.text();
+    const body = raw ? JSON.parse(raw) : {};
+    const toPhoneNumber = body?.toPhoneNumber as string;
 
     if (!isE164(toPhoneNumber)) {
-      return res.status(400).json({ error: "Missing or invalid toPhoneNumber (E.164 e.g. +15551234567)" });
+      return new Response(
+        JSON.stringify({ error: "Missing or invalid toPhoneNumber (E.164)" }),
+        setCors({ status: 400, headers: { "Content-Type": "application/json" } })
+      );
     }
 
-    const {
-      TWILIO_ACCOUNT_SID,
-      TWILIO_AUTH_TOKEN,
-      TWILIO_FROM_NUMBER,
-      PUBLIC_BASE_URL
-    } = process.env as Record<string, string | undefined>;
+    const env = process.env as Record<string, string | undefined>;
+    const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER, PUBLIC_BASE_URL } = env;
 
-    const baseUrl = PUBLIC_BASE_URL || getBaseUrl(req);
-    if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_FROM_NUMBER || !baseUrl) {
-      return res.status(500).json({ error: "Missing required environment variables" });
+    // derive base if not set
+    const base = PUBLIC_BASE_URL ?? `https://${new URL(req.url).host}`;
+    if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_FROM_NUMBER || !base) {
+      return new Response(
+        JSON.stringify({ error: "Missing required environment variables" }),
+        setCors({ status: 500, headers: { "Content-Type": "application/json" } })
+      );
     }
 
-    const twimlWebhookUrl = `${baseUrl.replace(/\/$/, "")}/api/twiml`;
+    const twimlWebhookUrl = `${base.replace(/\/$/, "")}/api/twiml`;
     const twilioURL = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Calls.json`;
 
     const form = new URLSearchParams({
       To: toPhoneNumber,
       From: TWILIO_FROM_NUMBER,
-      Url: twimlWebhookUrl
+      Url: twimlWebhookUrl,
     });
-    // Status callback for call lifecycle events
-    form.append("StatusCallback", `${baseUrl}/api/status`);
-    form.append("StatusCallbackMethod", "POST");
-    form.append("StatusCallbackEvent", "initiated ringing answered completed");
+
+    // Basic auth in Edge: use btoa
+    const auth = "Basic " + btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`);
 
     const r = await fetch(twilioURL, {
       method: "POST",
       headers: {
-        Authorization:
-          "Basic " + Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString("base64"),
-        "Content-Type": "application/x-www-form-urlencoded"
+        Authorization: auth,
+        "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: form.toString()
+      body: form.toString(),
     });
 
     const text = await r.text();
+    let payload: any = text;
     try {
-      return res.status(r.ok ? 200 : r.status).json(JSON.parse(text));
-    } catch {
-      return res.status(r.ok ? 200 : r.status).send(text);
-    }
-  } catch (err: any) {
-    console.error("trigger-call error:", err);
-    return res.status(500).json({ error: "Function crashed", detail: String(err?.message || err) });
+      payload = JSON.parse(text);
+    } catch {}
+
+    const isJson = typeof payload !== "string";
+    return new Response(
+      isJson ? JSON.stringify(payload) : payload,
+      setCors({
+        status: r.ok ? 200 : r.status,
+        headers: { "Content-Type": isJson ? "application/json" : "text/plain" },
+      })
+    );
+  } catch (e: any) {
+    return new Response(
+      JSON.stringify({ error: "Function crashed", detail: String(e?.message || e) }),
+      setCors({ status: 500, headers: { "Content-Type": "application/json" } })
+    );
   }
 }

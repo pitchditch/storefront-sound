@@ -1,5 +1,5 @@
-// /api/twiml.ts
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+// Edge runtime
+export const config = { runtime: "edge" };
 
 function xmlEscape(s: string) {
   return s
@@ -10,26 +10,20 @@ function xmlEscape(s: string) {
     .replace(/'/g, "&apos;");
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // CORS for browser-based health checks
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Requested-With");
-  if (req.method === "OPTIONS") return res.status(200).end();
-
-  res.setHeader("Content-Type", "text/xml");
+export default async function handler(_req: Request): Promise<Response> {
+  const headers = { "Content-Type": "text/xml" };
 
   try {
-    const agentId  = process.env.ELEVENLABS_AGENT_ID;
-    const apiKey   = process.env.ELEVENLABS_API_KEY;
+    const agentId = process.env.ELEVENLABS_AGENT_ID;
+    const apiKey = process.env.ELEVENLABS_API_KEY;
 
     if (!agentId || !apiKey) {
-      return res
-        .status(500)
-        .send(`<Response><Say>Server missing AI credentials.</Say></Response>`);
+      return new Response(
+        `<Response><Say>Server missing AI credentials.</Say></Response>`,
+        { status: 500, headers }
+      );
     }
 
-    // Try signed URL first (preferred)
     let signedUrl: string | null = null;
     try {
       const r = await fetch(
@@ -40,42 +34,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       );
       if (r.ok) {
         const j = (await r.json()) as { signed_url?: string };
-        if (j?.signed_url) signedUrl = j.signed_url;
+        signedUrl = j?.signed_url || null;
       } else {
-        const txt = await r.text().catch(() => "");
-        console.error("get_signed_url failed:", r.status, txt);
+        console.error("get_signed_url failed:", r.status, await r.text().catch(() => ""));
       }
     } catch (e) {
       console.error("get_signed_url error:", e);
     }
 
-    // Build TwiML
-    let xml: string;
-    if (signedUrl) {
-      xml = `
-        <Response>
-          <Connect>
-            <Stream url="wss://api.elevenlabs.io/v1/convai/stream">
-              <Parameter name="agent_id" value="${xmlEscape(agentId)}"/>
-              <Parameter name="signed_url" value="${xmlEscape(signedUrl)}"/>
-            </Stream>
-          </Connect>
-        </Response>
-      `.trim();
-    } else {
-      // Fallback: direct agent stream
-      xml = `
-        <Response>
-          <Connect>
-            <Stream url="wss://api.elevenlabs.io/v1/stream/agent/${xmlEscape(agentId)}"/>
-          </Connect>
-        </Response>
-      `.trim();
-    }
+    const xml = signedUrl
+      ? `<Response><Connect><Stream url="wss://api.elevenlabs.io/v1/convai/stream"><Parameter name="agent_id" value="${xmlEscape(
+          agentId
+        )}"/><Parameter name="signed_url" value="${xmlEscape(signedUrl)}"/></Stream></Connect></Response>`
+      : `<Response><Connect><Stream url="wss://api.elevenlabs.io/v1/stream/agent/${xmlEscape(
+          agentId
+        )}"/></Connect></Response>`;
 
-    return res.status(200).send(xml);
-  } catch (err) {
-    console.error("twiml error:", err);
-    return res.status(500).send(`<Response><Say>Application error. Goodbye.</Say></Response>`);
+    return new Response(xml, { status: 200, headers });
+  } catch (e) {
+    return new Response(
+      `<Response><Say>Application error. Goodbye.</Say></Response>`,
+      { status: 500, headers }
+    );
   }
 }
