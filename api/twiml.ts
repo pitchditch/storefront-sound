@@ -1,6 +1,18 @@
 // Edge runtime
 export const config = { runtime: "edge" };
 
+function setCors(res: ResponseInit): ResponseInit {
+  return {
+    ...res,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, X-Requested-With",
+      ...(res.headers as any),
+    },
+  };
+}
+
 function xmlEscape(s: string) {
   return s
     .replace(/&/g, "&amp;")
@@ -10,8 +22,12 @@ function xmlEscape(s: string) {
     .replace(/'/g, "&apos;");
 }
 
-export default async function handler(_req: Request): Promise<Response> {
-  const headers = { "Content-Type": "text/xml" };
+export default async function handler(req: Request): Promise<Response> {
+  if (req.method === "OPTIONS") {
+    return new Response(null, setCors({ status: 200 }));
+  }
+
+  const xmlHeaders = { "Content-Type": "text/xml" } as const;
 
   try {
     const agentId = process.env.ELEVENLABS_AGENT_ID;
@@ -20,7 +36,7 @@ export default async function handler(_req: Request): Promise<Response> {
     if (!agentId || !apiKey) {
       return new Response(
         `<Response><Say>Server missing AI credentials.</Say></Response>`,
-        { status: 500, headers }
+        setCors({ status: 500, headers: xmlHeaders })
       );
     }
 
@@ -50,11 +66,11 @@ export default async function handler(_req: Request): Promise<Response> {
           agentId
         )}"/></Connect></Response>`;
 
-    return new Response(xml, { status: 200, headers });
+    return new Response(xml, setCors({ status: 200, headers: xmlHeaders }));
   } catch (e) {
     return new Response(
       `<Response><Say>Application error. Goodbye.</Say></Response>`,
-      { status: 500, headers }
+      setCors({ status: 500, headers: xmlHeaders })
     );
   }
 }
