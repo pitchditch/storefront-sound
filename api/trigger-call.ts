@@ -58,13 +58,19 @@ export default async function handler(req: Request): Promise<Response> {
     }
 
     const twimlWebhookUrl = `${base.replace(/\/$/, "")}/api/twiml`;
+    const statusCallbackUrl = `${base.replace(/\/$/, "")}/api/status`;
     const twilioURL = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Calls.json`;
 
-    const form = new URLSearchParams({
-      To: toPhoneNumber,
-      From: TWILIO_FROM_NUMBER,
-      Url: twimlWebhookUrl,
-    });
+    const form = new URLSearchParams();
+    form.append("To", toPhoneNumber);
+    form.append("From", TWILIO_FROM_NUMBER);
+    form.append("Url", twimlWebhookUrl);
+    form.append("StatusCallback", statusCallbackUrl);
+    form.append("StatusCallbackMethod", "POST");
+    form.append("StatusCallbackEvent", "initiated");
+    form.append("StatusCallbackEvent", "ringing");
+    form.append("StatusCallbackEvent", "answered");
+    form.append("StatusCallbackEvent", "completed");
 
     // Basic auth in Edge: use btoa
     const auth = "Basic " + btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`);
