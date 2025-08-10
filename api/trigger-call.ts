@@ -1,9 +1,28 @@
 // /api/trigger-call.ts
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
+function setCors(res: VercelResponse) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Health-Check");
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
+    setCors(res);
+
+    if (req.method === "OPTIONS") {
+      // Preflight support for Settings check and browser POSTs
+      return res.status(200).end();
+    }
+
     if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+
+    const isHealthCheck =
+      req.headers["x-health-check"] === "true" || req.headers["x-health-check"] === "1";
+    if (isHealthCheck) {
+      return res.status(200).json({ ok: true, message: "trigger-call reachable" });
+    }
 
     const { toPhoneNumber, businessName, notes } = (req.body ?? {}) as {
       toPhoneNumber?: string;
