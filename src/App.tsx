@@ -6,6 +6,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Layout } from "./components/layout/Layout";
 import { Home } from "./pages/Home";
 import { Shop } from "./pages/Shop";
+import { Cart } from "./pages/Cart";
+import { Checkout } from "./pages/Checkout";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import BulkDialer from "./pages/BulkDialer";
@@ -24,6 +26,8 @@ const App = () => (
           {/* E-commerce Routes */}
           <Route path="/" element={<Layout><Home /></Layout>} />
           <Route path="/shop" element={<Layout><Shop /></Layout>} />
+          <Route path="/cart" element={<Layout><Cart /></Layout>} />
+          <Route path="/checkout" element={<Layout><Checkout /></Layout>} />
           
           {/* Legacy Routes - keeping for backward compatibility */}
           <Route path="/legacy" element={<Index />} />
